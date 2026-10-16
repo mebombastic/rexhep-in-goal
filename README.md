@@ -5,7 +5,7 @@ A tiny football game where Edo (#30) scores every single shot, and Rexhep finds 
 **Play it:** https://mebombastic.github.io/rexhep-in-goal/
 
 ## How to play
-- Swipe up on the ball to shoot (or tap a spot in the goal)
+- Swipe up on the ball to shoot (or tap a spot in the goal). All in-game text is in Bosnian.
 - Every shot is a goal. No exceptions.
 - Tap **Sound** in the corner for crowd noise
 

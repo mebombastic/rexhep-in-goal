@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="bs">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
@@ -49,8 +49,8 @@ canvas { display: block; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0
 <body>
 
 <div id="wrap">
-  <canvas id="c" aria-label="Football game: swipe or tap the goal to shoot. Edo always scores against Rexhep."></canvas>
-  <button id="mute" type="button">Sound: off</button>
+  <canvas id="c" aria-label="Fudbalska igra: povuci gore ili dodirni gol da šutiraš. Edo uvijek daje gol Rexhepu."></canvas>
+  <button id="mute" type="button">Zvuk: isklj</button>
 </div>
 
 <script>
@@ -190,48 +190,48 @@ function pitch(t, netShake) {
 const KX = 200, KY = 205;
 const SHOT = 0.55;
 const GAGS = [
-  { id: 'phone', pre: 'brb, 1 sec', post: 'who scored??', cap: 'HE WAS ON TIKTOK', com: 'Rexhep is checking his notifications. Edo is checking the scoreboard.',
+  { id: 'phone', pre: 'sekundu samo', post: 'ko je dao gol??', cap: 'BIO JE NA TIKTOKU', com: 'Rexhep provjerava notifikacije. Edo provjerava semafor.',
     draw(t, a) { body(KX, KY, C.red, '1', 'REXHEP', a ? 'shock' : 'happy', a ? (t > SHOT + 0.5 ? 'face' : 'down') : 'phone'); } },
-  { id: 'nutmeg', pre: 'come on then', post: 'my legs... why', cap: 'NUTMEGGED!', com: "Straight through the legs. Rexhep's legs have filed a complaint.", target: [200, 160],
+  { id: 'nutmeg', pre: 'hajde, probaj', post: 'noge moje... zašto', cap: 'KROZ NOGE!', com: 'Pravo kroz noge. Rexhepove noge su podnijele žalbu.', target: [200, 160],
     draw(t, a, g) { if (!a) body(KX, KY, C.red, '1', 'REXHEP', 'neutral', 'down', Math.sin(g * 4) * 2); else { const s = t - SHOT; if (s < 0.5) body(KX + Math.sin(s * 30) * 9, KY, C.red, '1', 'REXHEP', 'dizzy', 'flail', s * 30); else { lying(KX, KY + 35, 1, C.red, 'REXHEP', 'dizzy'); stars(KX + 30, KY + 15, t); } } } },
-  { id: 'net', pre: 'I got this one', post: "help... I'm stuck", cap: 'KEEPER IN THE NET', com: 'Rexhep dives so far he ends up inside the goal. The ball follows him in.',
+  { id: 'net', pre: 'ovu skidam', post: 'upomoć... zapeo sam', cap: 'GOLMAN U MREŽI', com: 'Rexhep se baci toliko daleko da završi u golu. Lopta ide za njim.',
     draw(t, a, g, tg) { if (t < SHOT * 0.3) body(KX, KY, C.red, '1', 'REXHEP', 'smug', 'down'); else { const k = clamp((t - SHOT * 0.3) / 0.45); const x = lerp(KX, tg[0] < 200 ? 250 : 150, k), y = lerp(KY + 10, GY - 25, k); lying(x, y, tg[0] < 200 ? 1 : -1, C.red, 'REXHEP', k < 1 ? 'shock' : 'dizzy'); if (k >= 1) { for (let i = 0; i < 6; i++) line(x - 54 + i * 18, y - 18, x - 48 + i * 18, y + 15, 'rgba(200,205,215,.95)', 2); line(x - 57, y - 3, x + 57, y - 3, 'rgba(200,205,215,.95)', 2); } } } },
-  { id: 'lace', pre: 'wait, my shoelace', post: "THAT'S NOT FAIR", cap: 'SHOELACE GOAL', com: 'Edo does not wait for shoelaces. Edo waits for nobody.',
+  { id: 'lace', pre: 'čekaj, pertla', post: 'TO NIJE FER', cap: 'GOL DOK VEŽE PERTLE', com: 'Edo ne čeka pertle. Edo ne čeka nikoga.',
     draw(t, a) { if (!a) { body(KX, KY + 20, C.red, '1', 'REXHEP', 'neutral', 'down', -6); line(KX - 12, KY + 66, KX + 15, KY + 71, '#fff', 2); } else body(KX, KY, C.red, '1', 'REXHEP', 'shock', Math.floor(t * 6) % 2 ? 'up' : 'flail', t * 20); } },
-  { id: 'face', pre: 'watch this save', post: 'my beautiful face', cap: 'SAVED... WITH HIS FACE', com: 'Technically a save. Technically also a goal. Doctors are on the way.', faceHit: true,
+  { id: 'face', pre: 'gledaj ovu odbranu', post: 'moje lijepo lice', cap: 'ODBRANIO... LICEM', com: 'Tehnički odbrana. Tehnički i gol. Doktori su na putu.', faceHit: true,
     draw(t, a) { const hit = SHOT * 0.6; if (t < hit) body(KX, KY, C.red, '1', 'REXHEP', t > 0 ? 'shock' : 'smug', 'down'); else { lying(KX, KY + 35, 1, C.red, 'REXHEP', 'dizzy'); circ(KX + 30, KY + 35, 7, 'rgba(255,90,90,.8)'); stars(KX + 30, KY + 15, t); } } },
-  { id: 'run', pre: 'NO NO NO NO', post: "I'm not paid enough", cap: 'HE RAN AWAY', com: 'Rexhep has decided the ball is the enemy. Honestly, fair.',
+  { id: 'run', pre: 'NE NE NE NE', post: 'nisam dovoljno plaćen', cap: 'POBJEGAO JE', com: 'Rexhep je odlučio da je lopta neprijatelj. Iskreno, ima pravo.',
     draw(t, a) { if (t <= 0) body(KX, KY, C.red, '1', 'REXHEP', 'shock', 'down'); else { const x = KX + t * 230; body(x, KY + 10, C.red, '1', 'REXHEP', 'shock', 'flail', Math.sin(t * 25) * 8 + t * 25); sweat(x, KY + 10); } }, bubbleX: t => KX + Math.max(0, t) * 230 },
-  { id: 'sleep', pre: 'Zzz', post: '...is it half time?', cap: 'HE FELL ASLEEP', com: 'Rexhep has gone into energy saving mode. Edo has not.',
+  { id: 'sleep', pre: 'Zzz', post: '...je li poluvrijeme?', cap: 'ZASPAO JE', com: 'Rexhep je prešao u štedni režim. Edo nije.',
     draw(t, a, g) { rrect(140, KY + 12, 130, 30, 6, '#78a0e6', C.dark, 2); circ(152, KY + 26, 14, '#fff', C.dark, 1.5); circ(154, KY + 24, 12, C.skin, C.dark, 2); face(154, KY + 24, t < SHOT + 0.3 ? 'sleep' : 'shock'); text('REXHEP', 205, KY + 62, 13, C.chalk, BODY, 3); if (t < SHOT + 0.3) zzz(170, KY + 4, g); } },
-  { id: 'flag', pre: 'I SURRENDER', post: 'I want my mum', cap: 'NO MERCY', com: 'Rexhep waves the white flag. Edo scores anyway, out of respect.',
+  { id: 'flag', pre: 'PREDAJEM SE', post: 'hoću kod mame', cap: 'BEZ MILOSTI', com: 'Rexhep maše bijelom zastavom. Edo ipak daje gol, iz poštovanja.',
     draw(t, a, g) { if (!a) body(KX, KY, C.red, '1', 'REXHEP', 'cry', 'flag', g * 6); else { lying(KX, KY + 35, -1, C.red, 'REXHEP', 'cry'); tears(KX - 30, KY + 32, g); } } },
-  { id: 'burek', pre: 'snack break', post: 'MY BUREK!!', cap: 'BUREK > FOOTBALL', com: 'Rexhep brought a burek into the six-yard box. Priorities.',
+  { id: 'burek', pre: 'pauza za užinu', post: 'MOJ BUREK!!', cap: 'BUREK > FUDBAL', com: 'Rexhep je unio burek u peterac. Prioriteti.',
     draw(t, a, g) { if (!a) body(KX, KY + 6, C.red, '1', 'REXHEP', 'happy', 'eat', 0); else { body(KX, KY, C.red, '1', 'REXHEP', 'cry', 'flail', t * 20); const k = clamp((t - SHOT) / 0.4); burek(KX + 30 + k * 10, lerp(KY - 10, KY + 50, k)); } } },
-  { id: 'dance', pre: 'this song slaps', post: 'wait, we were playing?', cap: 'DANCING ON DUTY', com: "Rexhep is vibing. The ball is in the net. Rexhep is still vibing.",
+  { id: 'dance', pre: 'ova pjesma je haos', post: 'čekaj, igramo?', cap: 'PLEŠE NA GOLU', com: 'Rexhep vajba. Lopta je u mreži. Rexhep i dalje vajba.',
     draw(t, a, g) { const dx = Math.sin(g * 8) * 14; body(KX + dx, KY - Math.abs(Math.sin(g * 8)) * 8, C.red, '1', 'REXHEP', a && t > SHOT + 0.6 ? 'shock' : 'happy', Math.floor(g * 4) % 2 ? 'up' : 'flail', dx * 0.4, { headphones: true }); } },
-  { id: 'selfie', pre: 'say cheese!', post: 'nice pic though', cap: 'SELFIE GOAL', com: 'Rexhep took a selfie with the ball. The ball took the lead.',
+  { id: 'selfie', pre: 'smajl!', post: 'ali dobra slika', cap: 'SELFIE GOL', com: 'Rexhep se slikao s loptom. Lopta je povela.',
     draw(t, a) { body(KX, KY, C.red, '1', 'REXHEP', a ? 'happy' : 'smug', 'selfie'); if (a && t < SHOT + 0.15) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(0, 0, W, H); } } },
-  { id: 'banana', pre: 'easy save', post: 'who left this here', cap: 'BANANA SLIP', com: 'Rexhep slips on a banana peel. Nobody knows how it got there. Edo is smiling.',
+  { id: 'banana', pre: 'lagana odbrana', post: 'ko je ovo ostavio', cap: 'OKLIZNUO SE', com: 'Rexhep se okliznuo na koru od banane. Niko ne zna odakle je. Edo se smije.',
     draw(t, a, g, tg) { banana(KX - 10, KY + 52); if (t < 0.15) body(KX, KY, C.red, '1', 'REXHEP', 'smug', 'down'); else { const k = clamp((t - 0.15) / 0.3); if (k < 1) { ctx.save(); ctx.translate(KX, KY + 45); ctx.rotate(-k * Math.PI / 2); body(0, -45, C.red, '1', '', 'shock', 'flail', 10); ctx.restore(); } else { lying(KX, KY + 38, -1, C.red, 'REXHEP', 'dizzy'); stars(KX - 30, KY + 18, g); } } } },
 ];
 
-const TAUNTS = ['TOP CORNER!', 'WHAT A STRIKE!', 'UNSTOPPABLE!', 'TOO EASY!', 'CLINICAL!', 'GOLAZO!', 'ZERO RESISTANCE', 'ROCKET!'];
+const TAUNTS = ['U RAŠLJE!', 'KAKAV ŠUT!', 'NEZAUSTAVLJIVO!', 'PRELAKO!', 'HLADNOKRVNO!', 'GOLČINA!', 'NULA OTPORA', 'RAKETA!'];
 const MILESTONES = {
-  3: ['HAT-TRICK!', 'Already a hat-trick. Rexhep is asking how many minutes are left.'],
-  5: ['FIVE STAR EDO', "Rexhep's mum has left the stadium."],
-  8: ['8 - 0', 'The original scoreline. Rexhep remembers it well.'],
-  10: ['DOUBLE DIGITS', 'Rexhep has requested a substitution. Request denied.'],
-  15: ['RECORD BROKEN', 'The scoreboard operator is running out of numbers.'],
-  20: ['TWENTY!', 'Rexhep has been officially transferred to the bench.'],
-  30: ['NUMBER 30 x 30', 'Thirty goals for number 30. Poetry.'],
-  50: ['FIFTY!!!', 'Rexhep has retired. He has also moved country.'],
-  100: ['LEGEND', 'One hundred goals. Rexhep is now a goalpost.'],
+  3: ['HET-TRIK!', 'Već het-trik. Rexhep pita koliko je još ostalo.'],
+  5: ['PET KOMADA', 'Rexhepova mama je napustila stadion.'],
+  8: ['8 - 0', 'Originalni rezultat. Rexhep ga dobro pamti.'],
+  10: ['DVOCIFRENO', 'Rexhep traži izmjenu. Zahtjev odbijen.'],
+  15: ['NOVI REKORD', 'Semaforu ponestaje brojeva.'],
+  20: ['DVADESET!', 'Rexhep je zvanično prebačen na klupu.'],
+  30: ['30 ZA BROJ 30', 'Trideset golova za broj 30. Poezija.'],
+  50: ['PEDESET!!!', 'Rexhep se penzionisao. I preselio u drugu državu.'],
+  100: ['LEGENDA', 'Sto golova. Rexhep je sada stativa.'],
 };
 
 // ---------- state ----------
 let best = 0; try { best = +localStorage.getItem('rexhep-best') || 0; } catch (e) {}
-const state = { mode: 'ready', goals: 0, shots: 0, t0: 0, gag: pick(GAGS), target: [200, 140], from: [200, 600], cap: '', com: 'Swipe up or tap the goal to shoot. Rexhep is ready. Allegedly.', banner: null, bannerT: 0, conf: [] };
+const state = { mode: 'ready', goals: 0, shots: 0, t0: 0, gag: pick(GAGS), target: [200, 140], from: [200, 600], cap: '', com: 'Povuci prstom gore ili dodirni gol da šutiraš. Rexhep je spreman. Navodno.', banner: null, bannerT: 0, conf: [] };
 let lastGagId = state.gag.id;
 const hot = window.claude?.hot;
 hot?.snapshot?.(() => ({ goals: state.goals, shots: state.shots }));
@@ -275,7 +275,7 @@ addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter')
 // ---------- sound (synth, starts only after a tap) ----------
 const sfx = (() => {
   let ac = null, on = false; const btn = document.getElementById('mute');
-  btn.addEventListener('click', () => { on = !on; btn.textContent = 'Sound: ' + (on ? 'on' : 'off'); unlock(); });
+  btn.addEventListener('click', () => { on = !on; btn.textContent = 'Zvuk: ' + (on ? 'uklj' : 'isklj'); unlock(); });
   function unlock() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (ac && ac.state === 'suspended') ac.resume(); }
   function noise(dur, f, vol) {
     if (!on || !ac) return; const n = ac.sampleRate * dur, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
@@ -333,7 +333,7 @@ function frame() {
   if (state.mode === 'ready' && state.goals === 0) {
     const p = (T % 1.6) / 1.6; ctx.globalAlpha = 1 - p;
     line(200, 590, 200, lerp(590, 470, ease(p)), C.led, 4); ctx.globalAlpha = 1;
-    text('SWIPE UP TO SHOOT', 200, 650, 15, C.led, DISP, 4);
+    text('POVUCI GORE ZA ŠUT', 200, 650, 15, C.led, DISP, 4);
   }
 
   // speech bubble
@@ -344,7 +344,7 @@ function frame() {
   // goal text
   if (after) {
     const k = clamp((t - SHOT) / 0.25), sh = reduce ? 0 : Math.sin(T * 60) * 5 * (1 - k);
-    text('GOAL!', 200 + sh, 360, lerp(26, 68, ease(k)), C.led, DISP, 7);
+    text('GOL!', 200 + sh, 360, lerp(26, 68, ease(k)), C.led, DISP, 7);
     text(state.taunt, 200, 410, 18, C.chalk, DISP, 5);
     text(state.cap, 200, 440, 15, C.rex, DISP, 4);
   }
@@ -374,8 +374,8 @@ function frame() {
 
   // commentary + stats bar
   rrect(10, 622 + 0, 380, 90, 14, 'rgba(0,0,0,.78)');
-  text('COMMENTARY', 24, 640, 10, C.led, DISP, 0, 'left');
-  text(`SHOTS ${state.shots} · GOALS ${state.goals} · 100% · BEST ${best}`, 376, 640, 10, C.muted, BODY, 0, 'right');
+  text('KOMENTAR', 24, 640, 10, C.led, DISP, 0, 'left');
+  text(`ŠUTEVI ${state.shots} · GOLOVI ${state.goals} · 100% · REKORD ${best}`, 376, 640, 10, C.muted, BODY, 0, 'right');
   wrap(state.com, 24, 664, 352, 15);
 
   requestAnimationFrame(frame);
