@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Rexhep in Goal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:wght@500;700;800&display=swap">
+<style>
+/* Layout: one-screen night-stadium arcade cabinet; canvas centred, letterboxed to fit the phone */
+:root {
+  --night: #0b1020;
+  --stand: #151c33;
+  --led: #ffcc2e;
+  --rex: #ff7a7a;
+  --chalk: #eef4ee;
+  --muted: #8f9bb8;
+  --display: "Bungee", "Arial Black", Impact, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 70% at 50% 0%, #1b2547 0%, var(--night) 60%);
+  background-color: var(--night);
+  color: var(--chalk);
+  font-family: var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+}
+#wrap { position: relative; height: 100%; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; }
+canvas { display: block; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); touch-action: none; cursor: crosshair; }
+#mute {
+  position: absolute; top: 10px; right: 10px;
+  font: 700 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--chalk); background: rgba(11,16,32,.7); border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px; padding: 8px 12px; cursor: pointer;
+}
+#mute:focus-visible { outline: 2px solid var(--led); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <canvas id="c" aria-label="Football game: swipe or tap the goal to shoot. Edo always scores against Rexhep."></canvas>
+  <button id="mute" type="button">Sound: off</button>
+</div>
+
+<script>
+(() => {
+const W = 400, H = 720;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = { night:'#0b1020', led:'#ffcc2e', rex:'#ff7a7a', chalk:'#eef4ee', muted:'#8f9bb8',
+  dark:'#1e1e1e', skin:'#f0c8a0', red:'#d2283a', white:'#f5f5f5', blue:'#5aaaff', g1:'#2f8a42', g2:'#37984a' };
+const DISP = '"Bungee","Arial Black",Impact,sans-serif', BODY = '"Archivo","Helvetica Neue",Arial,sans-serif';
+const GL = 112, GR = 288, GY = 168, GT = 112; // goal left/right, goal line y, crossbar y
+
+// ---------- sizing ----------
+let scale = 1;
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2); this.moveTo(x + r, y); this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r); this.arcTo(x, y + h, x, y, r); this.arcTo(x, y, x + w, y, r); this.closePath();
+  };
+}
+function fit() {
+  const r = document.getElementById('wrap').getBoundingClientRect();
+  let aw = r.width, ah = r.height;
+  if (aw < 100) aw = (window.innerWidth || document.documentElement.clientWidth || W) - 32;
+  if (ah < 200) ah = (window.innerHeight || document.documentElement.clientHeight || H) - 16;
+  scale = Math.max(0.3, Math.min(aw / W, ah / H));
+  const dpr = window.devicePixelRatio || 1;
+  cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+  cv.width = Math.round(W * scale * dpr); cv.height = Math.round(H * scale * dpr);
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+}
+addEventListener('resize', fit); fit();
+
+// ---------- helpers ----------
+const lerp = (a, b, t) => a + (b - a) * t, clamp = t => Math.max(0, Math.min(1, t));
+const ease = t => t * t * (3 - 2 * t);
+const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+function line(x1, y1, x2, y2, col, w) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+function circ(x, y, r, fill, stroke, w = 2) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = w; ctx.stroke(); } }
+function rrect(x, y, w, h, r, fill, stroke, lw = 2) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function text(s, x, y, size, col = C.chalk, font = DISP, stroke = 4, align = 'center') {
+  ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (stroke) { ctx.lineJoin = 'round'; ctx.strokeStyle = C.night; ctx.lineWidth = stroke; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = col; ctx.fillText(s, x, y);
+}
+function arc(x, y, r, a0, a1, col, w) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(x, y, r, a0, a1); ctx.stroke(); }
+
+// ---------- characters (scale ~0.6 of video) ----------
+function face(x, y, mood) {
+  const d = C.dark;
+  if (mood === 'sleep') { line(x - 7, y - 2, x - 3, y - 2, d, 2); line(x + 3, y - 2, x + 7, y - 2, d, 2); circ(x, y + 5, 2.5, null, d, 1.5); }
+  else if (mood === 'dizzy') { for (const e of [-5, 5]) { line(x + e - 2.5, y - 4, x + e + 2.5, y + 1, d, 2); line(x + e + 2.5, y - 4, x + e - 2.5, y + 1, d, 2); } arc(x, y + 8, 5, Math.PI * 1.15, Math.PI * 1.85, d, 2); }
+  else if (mood === 'shock') { circ(x - 5, y - 3, 3, '#fff', d, 1.5); circ(x + 5, y - 3, 3, '#fff', d, 1.5); circ(x, y + 6, 4, d); }
+  else if (mood === 'cry') { arc(x - 5, y - 1, 3.5, Math.PI * 1.1, Math.PI * 1.9, d, 2); arc(x + 5, y - 1, 3.5, Math.PI * 1.1, Math.PI * 1.9, d, 2); arc(x, y + 9, 5, Math.PI * 1.15, Math.PI * 1.85, d, 2); }
+  else if (mood === 'smug') { line(x - 7, y - 3, x - 3, y - 2, d, 2); line(x + 3, y - 2, x + 7, y - 3, d, 2); arc(x + 1, y + 1, 6, 0.3, Math.PI - 0.6, d, 2); }
+  else { circ(x - 4, y - 3, 1.8, d); circ(x + 4, y - 3, 1.8, d); if (mood === 'happy') arc(x, y + 1, 5.5, 0.3, Math.PI - 0.3, d, 2); else line(x - 3.5, y + 5, x + 3.5, y + 5, d, 2); }
+}
+// y = torso top
+function body(x, y, shirt, num, name, mood = 'neutral', arms = 'down', legs = 0, opts = {}) {
+  const d = C.dark;
+  line(x - 7, y + 24, x - 10 + legs, y + 48, d, 7); line(x + 7, y + 24, x + 10 - legs, y + 48, d, 7);
+  rrect(x - 18, y - 9, 36, 36, 7, shirt, d, 2);
+  if (arms === 'up') { line(x - 17, y - 3, x - 33, y - 33, C.skin, 6); line(x + 17, y - 3, x + 33, y - 33, C.skin, 6); }
+  else if (arms === 'phone') { line(x - 17, y - 3, x - 6, y + 6, C.skin, 6); line(x + 17, y - 3, x + 6, y + 6, C.skin, 6); rrect(x - 7, y - 5, 14, 18, 3, '#141414'); ctx.fillStyle = '#78beff'; ctx.fillRect(x - 5, y - 3, 10, 14); }
+  else if (arms === 'face') { line(x - 17, y - 3, x - 8, y - 24, C.skin, 6); line(x + 17, y - 3, x + 8, y - 24, C.skin, 6); }
+  else if (arms === 'flail') { const a = Math.sin(legs * 0.6) * 15; line(x - 17, y - 3, x - 36, y - 18 + a, C.skin, 6); line(x + 17, y - 3, x + 36, y - 18 - a, C.skin, 6); }
+  else if (arms === 'flag') {
+    line(x - 17, y - 3, x - 27, y + 18, C.skin, 6); line(x + 17, y - 3, x + 33, y - 30, C.skin, 6);
+    line(x + 33, y - 30, x + 33, y - 78, '#7a5028', 3);
+    const wv = Math.sin(legs) * 4; ctx.beginPath(); ctx.moveTo(x + 34, y - 78); ctx.lineTo(x + 72, y - 73 + wv); ctx.lineTo(x + 34, y - 54); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = d; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  else if (arms === 'eat') { line(x - 17, y - 3, x - 6, y - 14, C.skin, 6); line(x + 17, y - 3, x + 22, y + 18, C.skin, 6); burek(x, y - 18); }
+  else if (arms === 'selfie') { line(x - 17, y - 3, x - 27, y + 18, C.skin, 6); line(x + 17, y - 3, x + 40, y - 30, C.skin, 6); rrect(x + 36, y - 44, 12, 18, 3, '#141414'); }
+  else { line(x - 17, y - 3, x - 27, y + 18, C.skin, 6); line(x + 17, y - 3, x + 27, y + 18, C.skin, 6); }
+  circ(x, y - 23, 13, C.skin, d, 2);
+  if (opts.headphones) { arc(x, y - 25, 15, Math.PI, 0, '#222', 3); rrect(x - 17, y - 29, 6, 10, 2, '#e84393'); rrect(x + 11, y - 29, 6, 10, 2, '#e84393'); }
+  if (arms === 'face') { circ(x - 7, y - 23, 6, C.skin, d, 1.5); circ(x + 7, y - 23, 6, C.skin, d, 1.5); }
+  else if (arms !== 'eat') face(x, y - 23, mood);
+  if (num) text(num, x, y + 9, 13, C.dark, BODY, 0);
+  if (name) text(name, x, y + 62, 13, C.chalk, BODY, 3);
+}
+function lying(x, y, s, shirt, name, mood = 'dizzy') {
+  const d = C.dark;
+  line(x - s * 27, y, x - s * 51, y + 7, d, 7); line(x - s * 27, y + 5, x - s * 48, y + 17, d, 7);
+  rrect(x - 27, y - 11, 54, 22, 7, shirt, d, 2);
+  line(x + s * 18, y - 9, x + s * 36, y - 24, C.skin, 6);
+  circ(x + s * 30, y, 12, C.skin, d, 2); face(x + s * 30, y, mood);
+  if (name) text(name, x, y + 30, 13, C.chalk, BODY, 3);
+}
+function burek(x, y) { circ(x, y, 9, '#e3a64a', '#8a5a1c', 2); arc(x, y, 5, 0, Math.PI * 1.6, '#8a5a1c', 1.5); arc(x, y, 2, 0, Math.PI * 1.6, '#8a5a1c', 1.5); }
+function banana(x, y) { ctx.save(); ctx.translate(x, y); ctx.rotate(0.3); arc(0, -6, 12, 0.3, Math.PI - 0.3, '#f6d32d', 5); ctx.restore(); }
+function stars(x, y, t) { for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; const sx = x + Math.cos(a) * 18, sy = y + Math.sin(a) * 6; star(sx, sy, 5); } }
+function star(x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.closePath(); ctx.fillStyle = C.led; ctx.fill(); ctx.strokeStyle = C.dark; ctx.lineWidth = 1; ctx.stroke(); }
+function tears(x, y, t) { for (const s of [-1, 1]) for (let k = 0; k < 4; k++) { const p = (t * 2 + k / 4) % 1; circ(x + s * (9 + p * 40), y + p * 34 - Math.sin(p * Math.PI) * 24, 3, C.blue); } }
+function sweat(x, y) { for (let i = 0; i < 3; i++) circ(x - 22 - i * 10, y - 36 + i * 6, 3, C.blue); }
+function zzz(x, y, t) { for (let i = 0; i < 3; i++) { const p = (t * 0.8 + i / 3) % 1; text('Z', x + p * 34 + i * 3, y - p * 40, 11 + i * 4, '#fff', DISP, 2); } }
+function bubble(x, y, s) {
+  ctx.font = `700 14px ${BODY}`; const w = ctx.measureText(s).width + 20;
+  x = Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, x));
+  rrect(x - w / 2, y - 15, w, 30, 12, '#fff', C.dark, 2);
+  ctx.beginPath(); ctx.moveTo(x - 6, y + 14); ctx.lineTo(x + 6, y + 14); ctx.lineTo(x - 12, y + 26); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill();
+  text(s, x, y + 1, 14, C.dark, BODY, 0);
+}
+function ball(x, y, r = 8, spin = 0) {
+  circ(x, y, r, '#fff', '#141414', 2);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(spin); ctx.beginPath();
+  for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; ctx.lineTo(Math.cos(a) * r * 0.38, Math.sin(a) * r * 0.38); }
+  ctx.closePath(); ctx.fillStyle = '#141414'; ctx.fill(); ctx.restore();
+}
+
+// ---------- scene ----------
+function pitch(t, netShake) {
+  // stands + crowd
+  ctx.fillStyle = '#121933'; ctx.fillRect(0, 0, W, 92);
+  for (let i = 0; i < 70; i++) {
+    const cx = (i * 37) % W + 6, cy = 18 + ((i * 53) % 60);
+    const jump = state.mode === 'goal' && !reduce ? Math.abs(Math.sin(t * 12 + i)) * 5 : 0;
+    circ(cx, cy - jump, 4, ['#ff7a7a', '#ffcc2e', '#5aaaff', '#f5f5f5', '#9b7bff'][i % 5]);
+  }
+  for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? C.g1 : C.g2; ctx.fillRect(0, 92 + i * 70, W, 70); }
+  const chalk = 'rgba(238,244,238,.9)';
+  ctx.strokeStyle = chalk; ctx.lineWidth = 3;
+  ctx.strokeRect(62, GY, 276, 136); ctx.strokeRect(GL, GY, GR - GL, 52);
+  line(0, GY, W, GY, chalk, 3); circ(200, 262, 3, chalk);
+  arc(200, 300, 52, 0.35, Math.PI - 0.35, chalk, 3);
+  arc(200, H + 120, 160, Math.PI * 1.15, Math.PI * 1.85, chalk, 3);
+  // goal
+  const sx = netShake ? Math.sin(t * 50) * netShake : 0;
+  ctx.fillStyle = 'rgba(230,236,242,.92)'; ctx.fillRect(GL, GT, GR - GL, GY - GT);
+  ctx.strokeStyle = 'rgba(150,158,172,.9)'; ctx.lineWidth = 1;
+  for (let x = GL; x <= GR; x += 11) { ctx.beginPath(); ctx.moveTo(x + sx, GT); ctx.lineTo(x - sx, GY); ctx.stroke(); }
+  for (let y = GT; y <= GY; y += 9) { ctx.beginPath(); ctx.moveTo(GL, y + sx * 0.5); ctx.lineTo(GR, y - sx * 0.5); ctx.stroke(); }
+  ctx.fillStyle = '#fff'; ctx.fillRect(GL - 5, GT - 4, GR - GL + 10, 5); ctx.fillRect(GL - 5, GT - 4, 5, GY - GT + 6); ctx.fillRect(GR, GT - 4, 5, GY - GT + 6);
+}
+
+// gags: pre bubble, post bubble, caption, commentary, draw(t since shot, after, target, ballPos)
+const KX = 200, KY = 205;
+const SHOT = 0.55;
+const GAGS = [
+  { id: 'phone', pre: 'brb, 1 sec', post: 'who scored??', cap: 'HE WAS ON TIKTOK', com: 'Rexhep is checking his notifications. Edo is checking the scoreboard.',
+    draw(t, a) { body(KX, KY, C.red, '1', 'REXHEP', a ? 'shock' : 'happy', a ? (t > SHOT + 0.5 ? 'face' : 'down') : 'phone'); } },
+  { id: 'nutmeg', pre: 'come on then', post: 'my legs... why', cap: 'NUTMEGGED!', com: "Straight through the legs. Rexhep's legs have filed a complaint.", target: [200, 160],
+    draw(t, a, g) { if (!a) body(KX, KY, C.red, '1', 'REXHEP', 'neutral', 'down', Math.sin(g * 4) * 2); else { const s = t - SHOT; if (s < 0.5) body(KX + Math.sin(s * 30) * 9, KY, C.red, '1', 'REXHEP', 'dizzy', 'flail', s * 30); else { lying(KX, KY + 35, 1, C.red, 'REXHEP', 'dizzy'); stars(KX + 30, KY + 15, t); } } } },
+  { id: 'net', pre: 'I got this one', post: "help... I'm stuck", cap: 'KEEPER IN THE NET', com: 'Rexhep dives so far he ends up inside the goal. The ball follows him in.',
+    draw(t, a, g, tg) { if (t < SHOT * 0.3) body(KX, KY, C.red, '1', 'REXHEP', 'smug', 'down'); else { const k = clamp((t - SHOT * 0.3) / 0.45); const x = lerp(KX, tg[0] < 200 ? 250 : 150, k), y = lerp(KY + 10, GY - 25, k); lying(x, y, tg[0] < 200 ? 1 : -1, C.red, 'REXHEP', k < 1 ? 'shock' : 'dizzy'); if (k >= 1) { for (let i = 0; i < 6; i++) line(x - 54 + i * 18, y - 18, x - 48 + i * 18, y + 15, 'rgba(200,205,215,.95)', 2); line(x - 57, y - 3, x + 57, y - 3, 'rgba(200,205,215,.95)', 2); } } } },
+  { id: 'lace', pre: 'wait, my shoelace', post: "THAT'S NOT FAIR", cap: 'SHOELACE GOAL', com: 'Edo does not wait for shoelaces. Edo waits for nobody.',
+    draw(t, a) { if (!a) { body(KX, KY + 20, C.red, '1', 'REXHEP', 'neutral', 'down', -6); line(KX - 12, KY + 66, KX + 15, KY + 71, '#fff', 2); } else body(KX, KY, C.red, '1', 'REXHEP', 'shock', Math.floor(t * 6) % 2 ? 'up' : 'flail', t * 20); } },
+  { id: 'face', pre: 'watch this save', post: 'my beautiful face', cap: 'SAVED... WITH HIS FACE', com: 'Technically a save. Technically also a goal. Doctors are on the way.', faceHit: true,
+    draw(t, a) { const hit = SHOT * 0.6; if (t < hit) body(KX, KY, C.red, '1', 'REXHEP', t > 0 ? 'shock' : 'smug', 'down'); else { lying(KX, KY + 35, 1, C.red, 'REXHEP', 'dizzy'); circ(KX + 30, KY + 35, 7, 'rgba(255,90,90,.8)'); stars(KX + 30, KY + 15, t); } } },
+  { id: 'run', pre: 'NO NO NO NO', post: "I'm not paid enough", cap: 'HE RAN AWAY', com: 'Rexhep has decided the ball is the enemy. Honestly, fair.',
+    draw(t, a) { if (t <= 0) body(KX, KY, C.red, '1', 'REXHEP', 'shock', 'down'); else { const x = KX + t * 230; body(x, KY + 10, C.red, '1', 'REXHEP', 'shock', 'flail', Math.sin(t * 25) * 8 + t * 25); sweat(x, KY + 10); } }, bubbleX: t => KX + Math.max(0, t) * 230 },
+  { id: 'sleep', pre: 'Zzz', post: '...is it half time?', cap: 'HE FELL ASLEEP', com: 'Rexhep has gone into energy saving mode. Edo has not.',
+    draw(t, a, g) { rrect(140, KY + 12, 130, 30, 6, '#78a0e6', C.dark, 2); circ(152, KY + 26, 14, '#fff', C.dark, 1.5); circ(154, KY + 24, 12, C.skin, C.dark, 2); face(154, KY + 24, t < SHOT + 0.3 ? 'sleep' : 'shock'); text('REXHEP', 205, KY + 62, 13, C.chalk, BODY, 3); if (t < SHOT + 0.3) zzz(170, KY + 4, g); } },
+  { id: 'flag', pre: 'I SURRENDER', post: 'I want my mum', cap: 'NO MERCY', com: 'Rexhep waves the white flag. Edo scores anyway, out of respect.',
+    draw(t, a, g) { if (!a) body(KX, KY, C.red, '1', 'REXHEP', 'cry', 'flag', g * 6); else { lying(KX, KY + 35, -1, C.red, 'REXHEP', 'cry'); tears(KX - 30, KY + 32, g); } } },
+  { id: 'burek', pre: 'snack break', post: 'MY BUREK!!', cap: 'BUREK > FOOTBALL', com: 'Rexhep brought a burek into the six-yard box. Priorities.',
+    draw(t, a, g) { if (!a) body(KX, KY + 6, C.red, '1', 'REXHEP', 'happy', 'eat', 0); else { body(KX, KY, C.red, '1', 'REXHEP', 'cry', 'flail', t * 20); const k = clamp((t - SHOT) / 0.4); burek(KX + 30 + k * 10, lerp(KY - 10, KY + 50, k)); } } },
+  { id: 'dance', pre: 'this song slaps', post: 'wait, we were playing?', cap: 'DANCING ON DUTY', com: "Rexhep is vibing. The ball is in the net. Rexhep is still vibing.",
+    draw(t, a, g) { const dx = Math.sin(g * 8) * 14; body(KX + dx, KY - Math.abs(Math.sin(g * 8)) * 8, C.red, '1', 'REXHEP', a && t > SHOT + 0.6 ? 'shock' : 'happy', Math.floor(g * 4) % 2 ? 'up' : 'flail', dx * 0.4, { headphones: true }); } },
+  { id: 'selfie', pre: 'say cheese!', post: 'nice pic though', cap: 'SELFIE GOAL', com: 'Rexhep took a selfie with the ball. The ball took the lead.',
+    draw(t, a) { body(KX, KY, C.red, '1', 'REXHEP', a ? 'happy' : 'smug', 'selfie'); if (a && t < SHOT + 0.15) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(0, 0, W, H); } } },
+  { id: 'banana', pre: 'easy save', post: 'who left this here', cap: 'BANANA SLIP', com: 'Rexhep slips on a banana peel. Nobody knows how it got there. Edo is smiling.',
+    draw(t, a, g, tg) { banana(KX - 10, KY + 52); if (t < 0.15) body(KX, KY, C.red, '1', 'REXHEP', 'smug', 'down'); else { const k = clamp((t - 0.15) / 0.3); if (k < 1) { ctx.save(); ctx.translate(KX, KY + 45); ctx.rotate(-k * Math.PI / 2); body(0, -45, C.red, '1', '', 'shock', 'flail', 10); ctx.restore(); } else { lying(KX, KY + 38, -1, C.red, 'REXHEP', 'dizzy'); stars(KX - 30, KY + 18, g); } } } },
+];
+
+const TAUNTS = ['TOP CORNER!', 'WHAT A STRIKE!', 'UNSTOPPABLE!', 'TOO EASY!', 'CLINICAL!', 'GOLAZO!', 'ZERO RESISTANCE', 'ROCKET!'];
+const MILESTONES = {
+  3: ['HAT-TRICK!', 'Already a hat-trick. Rexhep is asking how many minutes are left.'],
+  5: ['FIVE STAR EDO', "Rexhep's mum has left the stadium."],
+  8: ['8 - 0', 'The original scoreline. Rexhep remembers it well.'],
+  10: ['DOUBLE DIGITS', 'Rexhep has requested a substitution. Request denied.'],
+  15: ['RECORD BROKEN', 'The scoreboard operator is running out of numbers.'],
+  20: ['TWENTY!', 'Rexhep has been officially transferred to the bench.'],
+  30: ['NUMBER 30 x 30', 'Thirty goals for number 30. Poetry.'],
+  50: ['FIFTY!!!', 'Rexhep has retired. He has also moved country.'],
+  100: ['LEGEND', 'One hundred goals. Rexhep is now a goalpost.'],
+};
+
+// ---------- state ----------
+let best = 0; try { best = +localStorage.getItem('rexhep-best') || 0; } catch (e) {}
+const state = { mode: 'ready', goals: 0, shots: 0, t0: 0, gag: pick(GAGS), target: [200, 140], from: [200, 600], cap: '', com: 'Swipe up or tap the goal to shoot. Rexhep is ready. Allegedly.', banner: null, bannerT: 0, conf: [] };
+let lastGagId = state.gag.id;
+const hot = window.claude?.hot;
+hot?.snapshot?.(() => ({ goals: state.goals, shots: state.shots }));
+const restored = hot?.data; if (restored && restored.goals) { state.goals = restored.goals; state.shots = restored.shots; }
+
+function nextGag() { let g; do g = pick(GAGS); while (g.id === lastGagId); lastGagId = g.id; return g; }
+
+function shoot(tx, ty) {
+  if (state.mode !== 'ready') return;
+  const g = state.gag;
+  let x = Math.max(GL + 12, Math.min(GR - 12, tx)), y = Math.max(GT + 10, Math.min(GY - 8, ty));
+  if (g.target) [x, y] = g.target;
+  state.target = [x, y]; state.mode = 'shot'; state.t0 = now(); state.shots++;
+  sfx.kick();
+}
+function scored() {
+  state.mode = 'goal'; state.goals++;
+  if (state.goals > best) { best = state.goals; try { localStorage.setItem('rexhep-best', best); } catch (e) {} }
+  state.cap = state.gag.cap; state.taunt = pick(TAUNTS); state.com = state.gag.com;
+  const m = MILESTONES[state.goals]; if (m) { state.banner = m[0]; state.com = m[1]; state.bannerT = now(); }
+  state.conf = Array.from({ length: reduce ? 0 : 70 }, () => ({ x: rnd(0, W), y: rnd(-200, 0), v: rnd(120, 260), c: pick([C.led, C.rex, C.blue, '#fff']), r: rnd(0, 6) }));
+  sfx.goal();
+}
+const now = () => performance.now() / 1000;
+
+// ---------- input ----------
+let down = null;
+function pos(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / scale, (e.clientY - r.top) / scale]; }
+cv.addEventListener('pointerdown', e => { e.preventDefault(); sfx.unlock(); down = { p: pos(e), t: now() }; });
+cv.addEventListener('pointerup', e => {
+  if (!down) return; const p = pos(e), [x0, y0] = down.p; down = null;
+  const dx = p[0] - x0, dy = p[1] - y0;
+  if (dy < -25) { // swipe up: aim along the swipe direction
+    const k = (GT + 25 - 600) / dy; const aimX = 200 + dx * k * 0.9 + rnd(-6, 6);
+    const power = clamp(-dy / 260); shoot(aimX, lerp(GY - 14, GT + 14, power));
+  } else if (p[1] < GY + 70) shoot(p[0], p[1]);
+  else shoot(200 + rnd(-70, 70), rnd(GT + 15, GY - 15));
+});
+addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); sfx.unlock(); shoot(pick([GL + 20, GR - 20, 200]), GT + 20); } });
+
+// ---------- sound (synth, starts only after a tap) ----------
+const sfx = (() => {
+  let ac = null, on = false; const btn = document.getElementById('mute');
+  btn.addEventListener('click', () => { on = !on; btn.textContent = 'Sound: ' + (on ? 'on' : 'off'); unlock(); });
+  function unlock() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (ac && ac.state === 'suspended') ac.resume(); }
+  function noise(dur, f, vol) {
+    if (!on || !ac) return; const n = ac.sampleRate * dur, b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.5);
+    const s = ac.createBufferSource(); s.buffer = b; const fl = ac.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = f; fl.Q.value = 0.6;
+    const g = ac.createGain(); g.gain.value = vol; s.connect(fl).connect(g).connect(ac.destination); s.start();
+  }
+  function tone(f, dur, vol, type = 'square', when = 0) {
+    if (!on || !ac) return; const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f;
+    const t = ac.currentTime + when; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+  }
+  return { unlock, kick() { noise(0.12, 180, 0.9); }, goal() { noise(2.2, 900, 0.35); [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 0.08, 'square', 0.15 + i * 0.09)); } };
+})();
+
+// ---------- loop ----------
+function frame() {
+  const T = now(); const t = state.mode === 'ready' ? 0 : T - state.t0;
+  if (state.mode === 'shot' && t >= SHOT) scored();
+  if (state.mode === 'goal' && t >= SHOT + 1.9) { state.mode = 'ready'; state.gag = nextGag(); }
+  const after = state.mode === 'goal';
+  const g = state.gag;
+
+  ctx.clearRect(0, 0, W, H);
+  pitch(T, after ? Math.max(0, 3 - (t - SHOT) * 6) : 0);
+
+  // keeper
+  g.draw(t, after, T, state.target);
+
+  // ball
+  const [fx, fy] = state.from; let bx = fx, by = fy, br = 9, spin = 0;
+  if (state.mode === 'shot' || after) {
+    const k = clamp(t / SHOT);
+    if (g.faceHit) {
+      const hit = 0.6;
+      if (k < hit) { const q = k / hit; bx = lerp(fx, KX, q); by = lerp(fy, KY - 23, q); }
+      else { const q = clamp((t - SHOT * hit) / (SHOT * 0.6)); bx = lerp(KX, state.target[0], q); by = lerp(KY - 23, state.target[1], q) - Math.sin(q * Math.PI) * 30; }
+    } else {
+      bx = lerp(fx, state.target[0], ease(k)); by = lerp(fy, state.target[1], k) - Math.sin(k * Math.PI) * 50;
+    }
+    br = lerp(9, 6, clamp((fy - by) / (fy - GT))); spin = t * 20;
+  }
+
+  // striker
+  const ex = 200, ey = 540;
+  if (after && t > SHOT + 0.25 && !reduce) {
+    const dx = Math.sin((t - SHOT) * 10) * 22;
+    body(ex + dx, ey - Math.abs(Math.sin(t * 10)) * 16, C.white, '30', 'EDO', 'happy', 'up', dx * 0.3);
+  } else if (state.mode === 'shot' && t < 0.15) {
+    body(ex - 6, ey + 4, C.white, '30', 'EDO', 'smug', 'down', 10);
+  } else body(ex, ey, C.white, '30', 'EDO', after ? 'happy' : 'smug', after ? 'up' : 'down', state.mode === 'ready' ? Math.sin(T * 3) * 2 : 0);
+  ball(bx, by, br, spin);
+
+  // aim hint
+  if (state.mode === 'ready' && state.goals === 0) {
+    const p = (T % 1.6) / 1.6; ctx.globalAlpha = 1 - p;
+    line(200, 590, 200, lerp(590, 470, ease(p)), C.led, 4); ctx.globalAlpha = 1;
+    text('SWIPE UP TO SHOOT', 200, 650, 15, C.led, DISP, 4);
+  }
+
+  // speech bubble
+  const bxk = g.bubbleX ? Math.min(330, g.bubbleX(t)) : KX + 40;
+  if (state.mode === 'ready' || (state.mode === 'shot' && t < SHOT * 0.5)) bubble(bxk, KY - 72, g.pre);
+  else if (after) bubble(bxk, KY - 72, g.post);
+
+  // goal text
+  if (after) {
+    const k = clamp((t - SHOT) / 0.25), sh = reduce ? 0 : Math.sin(T * 60) * 5 * (1 - k);
+    text('GOAL!', 200 + sh, 360, lerp(26, 68, ease(k)), C.led, DISP, 7);
+    text(state.taunt, 200, 410, 18, C.chalk, DISP, 5);
+    text(state.cap, 200, 440, 15, C.rex, DISP, 4);
+  }
+
+  // confetti
+  if (after) for (const c of state.conf) { const y = c.y + (t - SHOT) * c.v; if (y > H) continue; ctx.save(); ctx.translate(c.x + Math.sin(y / 20) * 8, y); ctx.rotate(c.r + y / 30); ctx.fillStyle = c.c; ctx.fillRect(-3, -5, 6, 10); ctx.restore(); }
+
+  // milestone banner
+  if (state.banner) {
+    const bt = T - state.bannerT; if (bt > 2.6) state.banner = null; else {
+      const k = clamp(bt / 0.3); ctx.globalAlpha = bt > 2.2 ? (2.6 - bt) / 0.4 : 1;
+      rrect(30, 470, 340, 56, 14, C.led, C.night, 3); text(state.banner, 200, 499, lerp(10, 26, ease(k)), C.night, DISP, 0); ctx.globalAlpha = 1;
+    }
+  }
+
+  // scoreboard (LED)
+  rrect(10, 8, 380, 64, 14, 'rgba(11,16,32,.92)', 'rgba(255,255,255,.12)', 1);
+  text('EDO', 62, 32, 20, C.chalk, DISP, 0);
+  text('REXHEP', 334, 32, 17, C.rex, DISP, 0);
+  rrect(140, 16, 120, 34, 8, C.led);
+  text(`${state.goals} - 0`, 200, 34, 22, C.night, DISP, 0);
+  const rexOvr = 12 - state.goals;
+  ctx.font = `700 11px ${BODY}`;
+  text(`OVR ${126 + state.goals}`, 62, 56, 11, C.led, BODY, 0);
+  text(`OVR ${rexOvr}`, 334, 56, 11, rexOvr < 0 ? C.rex : C.muted, BODY, 0);
+  text(`${Math.min(90, state.goals * 3 + 1)}'${state.goals * 3 + 1 > 90 ? ` +${state.goals * 3 + 1 - 90}` : ''}`, 200, 61, 11, C.muted, BODY, 0);
+
+  // commentary + stats bar
+  rrect(10, 622 + 0, 380, 90, 14, 'rgba(0,0,0,.78)');
+  text('COMMENTARY', 24, 640, 10, C.led, DISP, 0, 'left');
+  text(`SHOTS ${state.shots} · GOALS ${state.goals} · 100% · BEST ${best}`, 376, 640, 10, C.muted, BODY, 0, 'right');
+  wrap(state.com, 24, 664, 352, 15);
+
+  requestAnimationFrame(frame);
+}
+function wrap(s, x, y, maxW, size) {
+  ctx.font = `600 ${size}px ${BODY}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.chalk;
+  const words = s.split(' '); let lineS = '', ly = y;
+  for (const w of words) { const test = lineS ? lineS + ' ' + w : w; if (ctx.measureText(test).width > maxW) { ctx.fillText(lineS, x, ly); lineS = w; ly += size + 5; } else lineS = test; }
+  ctx.fillText(lineS, x, ly);
+}
+fit(); requestAnimationFrame(frame);
+setTimeout(fit, 300);
+try { document.fonts && document.fonts.ready.then(fit); } catch (e) {}
+})();
+</script>
+</body>
+</html>
